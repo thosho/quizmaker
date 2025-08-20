@@ -19,7 +19,13 @@
       margin-bottom: 10px; 
       box-sizing: border-box; 
     }
-    input[type="text"], input[type="file"] { 
+    input[type="text"], input[type="file"], input[type="password"] { 
+      width: 100%; 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      box-sizing: border-box; 
+    }
+    select { 
       width: 100%; 
       padding: 10px; 
       margin-bottom: 10px; 
@@ -48,6 +54,7 @@
     .score { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; }
     .api-section { margin-bottom: 20px; }
     .error { color: red; text-align: center; }
+    .hidden { display: none; }
 
     /* Mobile responsiveness */
     @media (max-width: 600px) {
@@ -73,8 +80,16 @@
 
   <div class="api-section">
     <p>Enter your Google Gemini API Key (optional for AI-generated quizzes):</p>
-    <input type="text" id="apiKeyInput" placeholder="Your Gemini API Key">
+    <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
   </div>
+
+  <p>Select number of questions:</p>
+  <select id="numQuestions">
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="25">25</option>
+    <option value="50">50</option>
+  </select>
 
   <button onclick="generateQuiz()">Generate Quiz</button>
 
@@ -119,9 +134,9 @@
           for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
             const page = await pdf.getPage(pageNum);
             const content = await page.getTextContent();
-            text += content.items.map(item => item.str).join(' ') + '\n';
+            text += content.items.map(item => item.str.trim()).filter(str => str).join(' ') + '\n\n';
           }
-          lessonInput.value = text;
+          lessonInput.value = text.trim(); // Clean up extra spaces
         };
         reader.readAsArrayBuffer(file);
       } else {
@@ -132,9 +147,11 @@
     async function generateQuiz() {
       const lesson = document.getElementById("lessonInput").value.trim();
       const apiKey = document.getElementById("apiKeyInput").value.trim();
+      const numQuestions = document.getElementById("numQuestions").value;
       const quizContainer = document.getElementById("quizContainer");
       const scoreContainer = document.getElementById("scoreContainer");
       const errorContainer = document.getElementById("errorContainer");
+      const apiSection = document.querySelector(".api-section");
       quizContainer.innerHTML = "";
       scoreContainer.innerHTML = "";
       errorContainer.innerHTML = "";
@@ -147,22 +164,27 @@
         return;
       }
 
+      // Hide API section after generation starts
+      apiSection.classList.add("hidden");
+
       // If API key is provided, use Gemini API for advanced quiz generation
       if (apiKey) {
         try {
-          const generatedQuestions = await generateAIQuestions(lesson, apiKey);
+          const generatedQuestions = await generateAIQuestions(lesson, apiKey, numQuestions);
           questions = generatedQuestions;
         } catch (error) {
           errorContainer.innerHTML = "Error generating quiz with AI: " + error.message;
+          apiSection.classList.remove("hidden"); // Show again on error
           return;
         }
       } else {
         // Fallback to simple fill-in-the-blank if no API key
-        questions = generateSimpleQuestions(lesson);
+        questions = generateSimpleQuestions(lesson, numQuestions);
       }
 
       if (questions.length === 0) {
         errorContainer.innerHTML = "Could not generate questions from the provided text.";
+        apiSection.classList.remove("hidden"); // Show again on error
         return;
       }
 
@@ -201,9 +223,9 @@
     }
 
     // Simple fallback question generator
-    function generateSimpleQuestions(lesson) {
+    function generateSimpleQuestions(lesson, num) {
       let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
-      sentences = sentences.slice(0, 5);
+      sentences = sentences.slice(0, num);
       let qs = [];
       sentences.forEach(sentence => {
         let words = sentence.split(" ");
@@ -221,9 +243,9 @@
     }
 
     // Gemini API integration for AI-generated questions with structured output
-    async function generateAIQuestions(lesson, apiKey) {
+    async function generateAIQuestions(lesson, apiKey, num) {
       const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey;
-      const prompt = `Generate 5 quiz questions from the following text. Include a mix of fill-in-the-blank and multiple-choice questions.
+      const prompt = `Generate ${num} quiz questions from the following text. Include a mix of fill-in-the-blank and multiple-choice questions.
 
 Text: ${lesson}`;
 
