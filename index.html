@@ -2,100 +2,194 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auto Quiz Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-    textarea { width: 100%; height: 120px; padding: 10px; margin-bottom: 10px; }
-    button { padding: 10px 15px; border: none; background: #4CAF50; color: white; cursor: pointer; border-radius: 6px; margin-top: 10px; }
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: #f9f9f9; 
+      line-height: 1.5; 
+    }
+    h2 { text-align: center; }
+    textarea { 
+      width: 100%; 
+      height: 120px; 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      box-sizing: border-box; 
+    }
+    input[type="text"], input[type="file"] { 
+      width: 100%; 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      box-sizing: border-box; 
+    }
+    button { 
+      padding: 10px 15px; 
+      border: none; 
+      background: #4CAF50; 
+      color: white; 
+      cursor: pointer; 
+      border-radius: 6px; 
+      margin-top: 10px; 
+      width: 100%; 
+      box-sizing: border-box; 
+    }
     button:hover { background: #45a049; }
-    .quiz { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .quiz { 
+      margin-top: 20px; 
+      padding: 15px; 
+      background: white; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+    }
     .question { margin-bottom: 15px; }
-    input[type="text"] { padding: 5px; width: 250px; }
-    .score { margin-top: 20px; font-weight: bold; font-size: 18px; }
+    .score { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; }
+    .api-section { margin-bottom: 20px; }
+    .error { color: red; text-align: center; }
+
+    /* Mobile responsiveness */
+    @media (max-width: 600px) {
+      body { margin: 10px; }
+      h2 { font-size: 1.5em; }
+      button { font-size: 1em; }
+      .quiz { padding: 10px; }
+    }
   </style>
+  <!-- Include pdf.js for PDF support -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.338/pdf.min.js"></script>
+  <!-- Include mammoth.js for DOCX support -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 </head>
 <body>
 
   <h2>📘 Auto Quiz Generator</h2>
-  <p>Paste your lesson text or upload a file:</p>
+  <p>Paste your lesson text or upload a file (TXT, PDF, DOCX):</p>
 
-  <textarea id="lessonInput" placeholder="Paste your lesson here..."></textarea><br>
+  <textarea id="lessonInput" placeholder="Paste your lesson here..."></textarea>
   
-  <input type="file" id="fileInput" accept=".txt,.pdf,.docx"><br><br>
+  <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
+
+  <div class="api-section">
+    <p>Enter your Google Gemini API Key (optional for AI-generated quizzes):</p>
+    <input type="text" id="apiKeyInput" placeholder="Your Gemini API Key">
+  </div>
 
   <button onclick="generateQuiz()">Generate Quiz</button>
 
   <div id="quizContainer" class="quiz"></div>
   <div id="scoreContainer" class="score"></div>
+  <div id="errorContainer" class="error"></div>
 
   <script>
     let totalQuestions = 0;
     let correctAnswers = 0;
+    let questions = []; // To store generated questions
 
-    // Load file and extract text
-    document.getElementById("fileInput").addEventListener("change", function(event) {
+    // Handle file upload and extract text
+    document.getElementById("fileInput").addEventListener("change", async function(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      const reader = new FileReader();
+      const lessonInput = document.getElementById("lessonInput");
+      const errorContainer = document.getElementById("errorContainer");
 
       if (file.name.endsWith(".txt")) {
+        const reader = new FileReader();
         reader.onload = function(e) {
-          document.getElementById("lessonInput").value = e.target.result;
+          lessonInput.value = e.target.result;
         };
         reader.readAsText(file);
       } else if (file.name.endsWith(".docx")) {
-        alert("DOCX support requires mammoth.js. (Can be added in next step)");
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          const arrayBuffer = e.target.result;
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          lessonInput.value = result.value;
+        };
+        reader.readAsArrayBuffer(file);
       } else if (file.name.endsWith(".pdf")) {
-        alert("PDF support requires pdf.js. (Can be added in next step)");
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          const typedarray = new Uint8Array(e.target.result);
+          const loadingTask = pdfjsLib.getDocument(typedarray);
+          const pdf = await loadingTask.promise;
+          let text = '';
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const content = await page.getTextContent();
+            text += content.items.map(item => item.str).join(' ') + '\n';
+          }
+          lessonInput.value = text;
+        };
+        reader.readAsArrayBuffer(file);
       } else {
-        alert("Unsupported file type. Please upload TXT, DOCX, or PDF.");
+        errorContainer.innerHTML = "Unsupported file type. Please upload TXT, DOCX, or PDF.";
       }
     });
 
-    function generateQuiz() {
-      const lesson = document.getElementById("lessonInput").value;
+    async function generateQuiz() {
+      const lesson = document.getElementById("lessonInput").value.trim();
+      const apiKey = document.getElementById("apiKeyInput").value.trim();
       const quizContainer = document.getElementById("quizContainer");
       const scoreContainer = document.getElementById("scoreContainer");
+      const errorContainer = document.getElementById("errorContainer");
       quizContainer.innerHTML = "";
       scoreContainer.innerHTML = "";
+      errorContainer.innerHTML = "";
       totalQuestions = 0;
       correctAnswers = 0;
+      questions = [];
 
-      if (!lesson.trim()) {
-        quizContainer.innerHTML = "<p style='color:red;'>Please paste text or upload a file first.</p>";
+      if (!lesson) {
+        errorContainer.innerHTML = "Please paste text or upload a file first.";
         return;
       }
 
-      // Split text into sentences
-      let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
-
-      // Pick up to 5 sentences for questions
-      sentences = sentences.slice(0, 5);
-
-      sentences.forEach((sentence, index) => {
-        let words = sentence.split(" ");
-        if (words.length > 4) {
-          let randomIndex;
-          do {
-            randomIndex = Math.floor(Math.random() * words.length);
-          } while (words[randomIndex].length < 4);
-
-          let answer = words[randomIndex].replace(/[^a-zA-Z]/g, "");
-          words[randomIndex] = "____";
-
-          let question = words.join(" ");
-          let div = document.createElement("div");
-          div.classList.add("question");
-          div.innerHTML = `
-            <p><b>Q${index + 1}:</b> ${question}</p>
-            <input type="text" placeholder="Your answer">
-            <button onclick="checkAnswer(this, '${answer}')">Check</button>
-          `;
-          quizContainer.appendChild(div);
-
-          totalQuestions++;
+      // If API key is provided, use Gemini API for advanced quiz generation
+      if (apiKey) {
+        try {
+          const generatedQuestions = await generateAIQuestions(lesson, apiKey);
+          questions = generatedQuestions;
+        } catch (error) {
+          errorContainer.innerHTML = "Error generating quiz with AI: " + error.message;
+          return;
         }
+      } else {
+        // Fallback to simple fill-in-the-blank if no API key
+        questions = generateSimpleQuestions(lesson);
+      }
+
+      if (questions.length === 0) {
+        errorContainer.innerHTML = "Could not generate questions from the provided text.";
+        return;
+      }
+
+      questions.forEach((q, index) => {
+        totalQuestions++;
+        let div = document.createElement("div");
+        div.classList.add("question");
+        if (q.type === 'fill-in-the-blank') {
+          div.innerHTML = `
+            <p><b>Q${index + 1}:</b> ${q.question}</p>
+            <input type="text" placeholder="Your answer">
+            <button onclick="checkAnswer(this, '${q.answer}')">Check</button>
+          `;
+        } else if (q.type === 'multiple-choice') {
+          let optionsHtml = q.options.map((opt, i) => `
+            <label>
+              <input type="radio" name="q${index}" value="${i}">
+              ${opt}
+            </label><br>
+          `).join('');
+          div.innerHTML = `
+            <p><b>Q${index + 1}:</b> ${q.question}</p>
+            ${optionsHtml}
+            <button onclick="checkMCQAnswer(this, ${q.correctIndex}, ${index})">Check</button>
+          `;
+        }
+        quizContainer.appendChild(div);
       });
 
       if (totalQuestions > 0) {
@@ -104,6 +198,70 @@
         finishBtn.onclick = showScore;
         quizContainer.appendChild(finishBtn);
       }
+    }
+
+    // Simple fallback question generator
+    function generateSimpleQuestions(lesson) {
+      let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
+      sentences = sentences.slice(0, 5);
+      let qs = [];
+      sentences.forEach(sentence => {
+        let words = sentence.split(" ");
+        if (words.length > 4) {
+          let randomIndex = Math.floor(Math.random() * words.length);
+          while (words[randomIndex].length < 4) {
+            randomIndex = Math.floor(Math.random() * words.length);
+          }
+          let answer = words[randomIndex].replace(/[^a-zA-Z]/g, "");
+          words[randomIndex] = "____";
+          qs.push({ type: 'fill-in-the-blank', question: words.join(" "), answer });
+        }
+      });
+      return qs;
+    }
+
+    // Gemini API integration for AI-generated questions with structured output
+    async function generateAIQuestions(lesson, apiKey) {
+      const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey;
+      const prompt = `Generate 5 quiz questions from the following text. Include a mix of fill-in-the-blank and multiple-choice questions.
+
+Text: ${lesson}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  type: { type: 'STRING' },
+                  question: { type: 'STRING' },
+                  answer: { type: 'STRING' },
+                  options: {
+                    type: 'ARRAY',
+                    items: { type: 'STRING' }
+                  },
+                  correctIndex: { type: 'INTEGER' }
+                },
+                propertyOrdering: ['type', 'question', 'answer', 'options', 'correctIndex']
+              }
+            }
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed: ' + response.statusText);
+      }
+
+      const data = await response.json();
+      const jsonText = data.candidates[0].content.parts[0].text;
+      return JSON.parse(jsonText);
     }
 
     function checkAnswer(button, correctAnswer) {
@@ -117,6 +275,23 @@
         }
         input.disabled = true;
         button.disabled = true;
+      }
+    }
+
+    function checkMCQAnswer(button, correctIndex, qIndex) {
+      const radios = document.querySelectorAll(`input[name="q${qIndex}"]`);
+      let selectedValue = -1;
+      radios.forEach((radio, i) => {
+        if (radio.checked) selectedValue = i;
+        radio.disabled = true;
+      });
+      button.disabled = true;
+
+      if (selectedValue === correctIndex) {
+        correctAnswers++;
+        button.previousElementSibling.style.color = "green"; // Highlight the options container
+      } else {
+        button.previousElementSibling.style.color = "red";
       }
     }
 
