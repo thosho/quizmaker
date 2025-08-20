@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Quiz Generator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+    textarea { width: 100%; height: 120px; padding: 10px; margin-bottom: 10px; }
+    button { padding: 10px 15px; border: none; background: #4CAF50; color: white; cursor: pointer; border-radius: 6px; margin-top: 10px; }
+    button:hover { background: #45a049; }
+    .quiz { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .question { margin-bottom: 15px; }
+    input[type="text"] { padding: 5px; width: 250px; }
+    .score { margin-top: 20px; font-weight: bold; font-size: 18px; }
+  </style>
+</head>
+<body>
+
+  <h2>📘 Auto Quiz Generator</h2>
+  <p>Paste your lesson text or upload a file:</p>
+
+  <textarea id="lessonInput" placeholder="Paste your lesson here..."></textarea><br>
+  
+  <input type="file" id="fileInput" accept=".txt,.pdf,.docx"><br><br>
+
+  <button onclick="generateQuiz()">Generate Quiz</button>
+
+  <div id="quizContainer" class="quiz"></div>
+  <div id="scoreContainer" class="score"></div>
+
+  <script>
+    let totalQuestions = 0;
+    let correctAnswers = 0;
+
+    // Load file and extract text
+    document.getElementById("fileInput").addEventListener("change", function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+
+      if (file.name.endsWith(".txt")) {
+        reader.onload = function(e) {
+          document.getElementById("lessonInput").value = e.target.result;
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith(".docx")) {
+        alert("DOCX support requires mammoth.js. (Can be added in next step)");
+      } else if (file.name.endsWith(".pdf")) {
+        alert("PDF support requires pdf.js. (Can be added in next step)");
+      } else {
+        alert("Unsupported file type. Please upload TXT, DOCX, or PDF.");
+      }
+    });
+
+    function generateQuiz() {
+      const lesson = document.getElementById("lessonInput").value;
+      const quizContainer = document.getElementById("quizContainer");
+      const scoreContainer = document.getElementById("scoreContainer");
+      quizContainer.innerHTML = "";
+      scoreContainer.innerHTML = "";
+      totalQuestions = 0;
+      correctAnswers = 0;
+
+      if (!lesson.trim()) {
+        quizContainer.innerHTML = "<p style='color:red;'>Please paste text or upload a file first.</p>";
+        return;
+      }
+
+      // Split text into sentences
+      let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
+
+      // Pick up to 5 sentences for questions
+      sentences = sentences.slice(0, 5);
+
+      sentences.forEach((sentence, index) => {
+        let words = sentence.split(" ");
+        if (words.length > 4) {
+          let randomIndex;
+          do {
+            randomIndex = Math.floor(Math.random() * words.length);
+          } while (words[randomIndex].length < 4);
+
+          let answer = words[randomIndex].replace(/[^a-zA-Z]/g, "");
+          words[randomIndex] = "____";
+
+          let question = words.join(" ");
+          let div = document.createElement("div");
+          div.classList.add("question");
+          div.innerHTML = `
+            <p><b>Q${index + 1}:</b> ${question}</p>
+            <input type="text" placeholder="Your answer">
+            <button onclick="checkAnswer(this, '${answer}')">Check</button>
+          `;
+          quizContainer.appendChild(div);
+
+          totalQuestions++;
+        }
+      });
+
+      if (totalQuestions > 0) {
+        let finishBtn = document.createElement("button");
+        finishBtn.textContent = "Finish Quiz";
+        finishBtn.onclick = showScore;
+        quizContainer.appendChild(finishBtn);
+      }
+    }
+
+    function checkAnswer(button, correctAnswer) {
+      const input = button.previousElementSibling;
+      if (!input.disabled) {
+        if (input.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+          correctAnswers++;
+          input.style.borderColor = "green";
+        } else {
+          input.style.borderColor = "red";
+        }
+        input.disabled = true;
+        button.disabled = true;
+      }
+    }
+
+    function showScore() {
+      const scoreContainer = document.getElementById("scoreContainer");
+      scoreContainer.innerHTML = `🎯 Your Score: ${correctAnswers} / ${totalQuestions}`;
+    }
+  </script>
+
+</body>
+</html>
