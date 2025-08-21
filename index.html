@@ -97,7 +97,7 @@
 </head>
 <body>
 
-  <h2>📘 Auto Quiz Generator</h2>
+  <h2>📘 Quiz Generator</h2>
   <div id="inputSection">
     <p>Paste your lesson text or upload a file (TXT, PDF, DOCX):</p>
 
@@ -118,7 +118,7 @@
 
     <div class="select-container">
       <div>
-        <p>No of Q:</p>
+        <p>No of Q's :</p>
         <select id="numQuestions">
           <option value="5">5</option>
           <option value="10">10</option>
@@ -127,11 +127,18 @@
         </select>
       </div>
       <div>
-        <p>Level:</p>
+        <p>Level :</p>
         <select id="difficulty">
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
           <option value="hard">Hard</option>
+        </select>
+      </div>
+      <div>
+        <p>Type :</p>
+        <select id="quizType">
+          <option value="multiple-choice">Multiple Choice</option>
+          <option value="true-false">True/False</option>
         </select>
       </div>
     </div>
@@ -212,6 +219,7 @@
       const userApiKey = aiSource === 'your' ? document.getElementById("apiKeyInput").value.trim() : null;
       const numQuestions = document.getElementById("numQuestions").value;
       const difficulty = document.getElementById("difficulty").value;
+      const quizType = document.getElementById("quizType").value;
       const quizContainer = document.getElementById("quizContainer");
       const scoreContainer = document.getElementById("scoreContainer");
       const errorContainer = document.getElementById("errorContainer");
@@ -221,7 +229,7 @@
       errorContainer.innerHTML = "";
       errorContainer.classList.remove('error');
       errorContainer.classList.add('loading');
-      errorContainer.innerHTML = "Wait a second till AI generates the Quiz...";
+      errorContainer.innerHTML = "Wait a second till we generates the Quiz...";
       totalQuestions = 0;
       correctAnswers = 0;
       questions = [];
@@ -243,7 +251,7 @@
         const keysToUse = aiSource === 'our' ? OUR_API_KEYS : [userApiKey];
         for (let i = 0; i < keysToUse.length; i++) {
           try {
-            const generatedQuestions = await generateAIQuestions(lesson, keysToUse[i], numQuestions, difficulty);
+            const generatedQuestions = await generateAIQuestions(lesson, keysToUse[i], numQuestions, difficulty, quizType);
             questions = generatedQuestions;
             generated = true;
             break; // Success, stop trying other keys
@@ -260,7 +268,7 @@
 
       // Fallback to local if AI failed or No AI selected
       if (!generated || aiSource === 'none') {
-        questions = generateSimpleMCQ(lesson, numQuestions, difficulty);
+        questions = generateSimpleQuestions(lesson, numQuestions, difficulty, quizType);
       }
 
       errorContainer.innerHTML = ""; // Clear loading message
@@ -299,25 +307,30 @@
       }
     }
 
-    // Simple local MCQ generator (fallback) with difficulty adjustment
-    function generateSimpleMCQ(lesson, num, difficulty) {
+    // Simple local question generator (MCQ or True/False) with difficulty adjustment
+    function generateSimpleQuestions(lesson, num, difficulty, quizType) {
       let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
       sentences = sentences.slice(0, num);
       let qs = [];
-      let numOptions = difficulty === 'easy' ? 3 : (difficulty === 'medium' ? 4 : 5); // Vary options by difficulty
+      let numOptions = quizType === 'true-false' ? 2 : (difficulty === 'easy' ? 3 : (difficulty === 'medium' ? 4 : 5));
       sentences.forEach(sentence => {
         let words = sentence.split(" ").filter(w => w.length > 3); // Filter short words
         if (words.length >= 1) {
           let correctIndex = Math.floor(Math.random() * numOptions); // Random correct position
-          let question = "What is the best word to complete: " + sentence.replace(/\w+/g, (match, offset) => {
+          let question = quizType === 'true-false' ? `Is this statement true: "${sentence}"?` : "What is the best word to complete: " + sentence.replace(/\w+/g, (match, offset) => {
             return (offset % (difficulty === 'easy' ? 3 : 2) === 0) ? "____" : match; // More blanks for harder
           });
           let options = [];
-          for (let i = 0; i < numOptions; i++) {
-            if (i === correctIndex) {
-              options.push(words[Math.floor(Math.random() * words.length)]); // Correct (random from text)
-            } else {
-              options.push(generateDistractor(difficulty)); // Distractors based on difficulty
+          if (quizType === 'true-false') {
+            options = ['True', 'False'];
+            correctIndex = Math.random() < 0.5 ? 0 : 1; // Randomly true or false
+          } else {
+            for (let i = 0; i < numOptions; i++) {
+              if (i === correctIndex) {
+                options.push(words[Math.floor(Math.random() * words.length)]); // Correct (random from text)
+              } else {
+                options.push(generateDistractor(difficulty)); // Distractors based on difficulty
+              }
             }
           }
           qs.push({ question, options, correctIndex });
@@ -335,10 +348,11 @@
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
-    // Gemini API integration for AI-generated questions with structured output (only MCQ)
-    async function generateAIQuestions(lesson, apiKey, num, difficulty) {
+    // Gemini API integration for AI-generated questions with structured output
+    async function generateAIQuestions(lesson, apiKey, num, difficulty, quizType) {
       const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey;
-      const prompt = `Generate ${num} multiple-choice quiz questions at ${difficulty} difficulty from the following text. Each question should have 4 options, with one best answer.
+      const typeText = quizType === 'true-false' ? 'true/false questions with True and False options' : 'multiple-choice questions with 4 options and one best answer';
+      const prompt = `Generate ${num} ${typeText} at ${difficulty} difficulty from the following text.
 
 Text: ${lesson}`;
 
