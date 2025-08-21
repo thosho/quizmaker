@@ -28,19 +28,15 @@
     }
     .select-container {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 10px;
       margin-bottom: 10px;
     }
     select { 
       padding: 10px; 
       box-sizing: border-box; 
-    }
-    #numQuestions {
-      width: 60%; /* Wider for number of questions */
-    }
-    #difficulty {
-      width: 40%; /* Smaller for difficulty */
+      width: auto; /* Auto width based on content */
+      min-width: 100px; /* Minimum width to prevent too small */
     }
     button { 
       padding: 10px 15px; 
@@ -80,6 +76,7 @@
     }
     .api-section { margin-bottom: 20px; }
     .error { color: red; text-align: center; }
+    .loading { color: blue; text-align: center; font-style: italic; }
     .hidden { display: none; }
 
     /* Mobile responsiveness */
@@ -90,7 +87,7 @@
       .quiz { padding: 10px; }
       .score { font-size: 16px; padding: 8px; top: 5px; right: 10px; }
       .select-container { flex-direction: column; gap: 5px; }
-      #numQuestions, #difficulty { width: 100%; }
+      select { width: 100%; }
     }
   </style>
   <!-- Include pdf.js for PDF support -->
@@ -112,7 +109,7 @@
       <p>Choose AI source:</p>
       <label><input type="radio" name="aiSource" value="our" checked> Use Our AI</label>
       <label><input type="radio" name="aiSource" value="your"> Use Your AI</label>
-      <label><input type="radio" name="aiSource" value="none"> Local Generation </label>
+      <label><input type="radio" name="aiSource" value="none"> No AI (Local Generation)</label>
       <div id="yourKeySection" style="display: none;">
         <p>Enter your Google Gemini API Key:</p>
         <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
@@ -120,8 +117,8 @@
     </div>
 
     <div class="select-container">
-      <div style="width: 60%;">
-        <p>Select number of questions:</p>
+      <div>
+        <p>No of Q:</p>
         <select id="numQuestions">
           <option value="5">5</option>
           <option value="10">10</option>
@@ -129,8 +126,8 @@
           <option value="50">50</option>
         </select>
       </div>
-      <div style="width: 40%;">
-        <p>Select difficulty:</p>
+      <div>
+        <p>Level:</p>
         <select id="difficulty">
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
@@ -222,11 +219,16 @@
       scoreContainer.innerHTML = "";
       scoreContainer.style.display = 'none'; // Hide score initially
       errorContainer.innerHTML = "";
+      errorContainer.classList.remove('error');
+      errorContainer.classList.add('loading');
+      errorContainer.innerHTML = "Wait a second till AI generates the Quiz...";
       totalQuestions = 0;
       correctAnswers = 0;
       questions = [];
 
       if (!lesson) {
+        errorContainer.classList.remove('loading');
+        errorContainer.classList.add('error');
         errorContainer.innerHTML = "Please paste text or upload a file first.";
         return;
       }
@@ -261,7 +263,11 @@
         questions = generateSimpleMCQ(lesson, numQuestions, difficulty);
       }
 
+      errorContainer.innerHTML = ""; // Clear loading message
+      errorContainer.classList.remove('loading');
+
       if (questions.length === 0) {
+        errorContainer.classList.add('error');
         errorContainer.innerHTML = "Could not generate questions from the provided text.";
         document.getElementById("inputSection").classList.remove("hidden"); // Show inputs again on error
         return;
