@@ -175,7 +175,11 @@
       button { font-size: 1em; }
       .quiz { padding: 10px; }
       h2 .score { font-size: 14px; padding: 5px; top: -10px; right: 0; }
-      .select-container { flex-direction: column; gap: 5px; }
+      .select-container { 
+        flex-direction: column; 
+        gap: 5px; 
+        align-items: flex-start; /* Left-align in mobile */
+      }
       select { width: 100%; }
       button.info { height: auto; }
       #infoModal { max-width: 90%; padding: 15px; }
