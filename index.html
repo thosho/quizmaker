@@ -182,17 +182,17 @@
 
   <h2>Quiz Maker <span id="scoreContainer" class="score"></span></h2>
   <div id="inputSection">
-    <p>Create Your Own Quiz with Your Own Data...</p>
+    <p>Create Your Own Quiz with Your Own Data & For Better Questions use "AI"</p>
 
     <textarea id="lessonInput" placeholder="Paste your lesson text or upload a file (TXT, PDF, DOCX):"></textarea>
     
     <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
 
     <div class="api-section">
-      <p>Choose AI source:</p>
-      <label><input type="radio" name="aiSource" value="our" checked> Use Our AI</label>
-      <label><input type="radio" name="aiSource" value="your"> Use Your AI<button class="info" onclick="showInfo()" style="margin-left: 5px; width: auto; padding: 2px 6px; font-size: 12px;">?</button></label>
-      <label><input type="radio" name="aiSource" value="none"> Local Generation</label>
+      <p>Use one of Generator :</p>
+      <label><input type="radio" name="aiSource" value="our" checked> Quiz Maker AI (Limited)</label>
+      <label><input type="radio" name="aiSource" value="your"> Your own Gemini AI Key <button class="info" onclick="showInfo()" style="margin-left: 5px; width: auto; padding: 2px 6px; font-size: 12px;">?</button></label>
+      <label><input type="radio" name="aiSource" value="none"> Local (not advanced Qs)</label>
       <div id="yourKeySection" style="display: none;">
         <p>Enter your Google Gemini API Key:</p>
         <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
