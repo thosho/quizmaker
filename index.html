@@ -163,6 +163,14 @@
       font-size: 12px;
       margin-top: 20px;
       color: #666; /* Subtle color */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    footer #darkModeToggle {
+      position: absolute;
+      right: 0;
     }
     body.dark footer {
       color: #bbb;
@@ -185,6 +193,7 @@
       #infoModal { max-width: 90%; padding: 15px; }
       #darkModeToggle { font-size: 18px; }
       .question button { width: 100%; margin-top: 10px; } /* Stack check buttons vertically on mobile */
+      footer #darkModeToggle { right: 10px; }
     }
   </style>
   <!-- Include pdf.js for PDF support -->
@@ -196,7 +205,7 @@
 
   <h2>Quiz Maker <span id="scoreContainer" class="score"></span></h2>
   <div id="inputSection">
-    <p>Create Your Quiz with Your Own Data & For Better Questions use "AI" modes</p>
+    <p>Create Quiz with Your Own Data & For Better Q's use "AI" modes</p>
 
     <textarea id="lessonInput" placeholder="Paste your lesson text or upload a file (TXT, PDF, DOCX):"></textarea>
     
@@ -238,9 +247,6 @@
           <option value="true-false">True/False</option>
         </select>
       </div>
-      <div>
-        <button id="darkModeToggle" onclick="toggleDarkMode()">🌙</button>
-      </div>
     </div>
   </div>
 
@@ -263,8 +269,8 @@
     <p>Note: Free tier has usage limits; check Google's terms.</p>
     <button onclick="hideInfo()">Close</button>
   </div>
-
-  <footer>Designed by THOSHO</footer>
+  <button id="darkModeToggle" onclick="toggleDarkMode()">🌙</button>
+  <footer>Designed by THOSHO </footer>
 
   <script>
     const OUR_API_KEYS = [
@@ -567,3 +573,4 @@ Text: ${lesson}`;
 
 </body>
 </html>
+
