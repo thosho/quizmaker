@@ -10,6 +10,7 @@
       margin: 20px; 
       background: #f9f9f9; 
       line-height: 1.5; 
+      position: relative; /* For absolute positioning */
     }
     h2 { text-align: center; }
     textarea { 
@@ -25,11 +26,21 @@
       margin-bottom: 10px; 
       box-sizing: border-box; 
     }
+    .select-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
     select { 
-      width: 100%; 
       padding: 10px; 
-      margin-bottom: 10px; 
       box-sizing: border-box; 
+    }
+    #numQuestions {
+      width: 60%; /* Wider for number of questions */
+    }
+    #difficulty {
+      width: 40%; /* Smaller for difficulty */
     }
     button { 
       padding: 10px 15px; 
@@ -43,6 +54,8 @@
       box-sizing: border-box; 
     }
     button:hover { background: #45a049; }
+    button.reset { background: #f44336; } /* Red for reset button */
+    button.reset:hover { background: #d32f2f; }
     .quiz { 
       margin-top: 20px; 
       padding: 15px; 
@@ -51,7 +64,20 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
     }
     .question { margin-bottom: 15px; }
-    .score { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; }
+    .score { 
+      position: absolute; 
+      top: 10px; 
+      right: 20px; 
+      font-weight: bold; 
+      font-size: 18px; 
+      text-align: right; 
+      color: #4CAF50; 
+      background: #e8f5e9; 
+      padding: 10px; 
+      border-radius: 6px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+      display: none; /* Hidden initially */
+    }
     .api-section { margin-bottom: 20px; }
     .error { color: red; text-align: center; }
     .hidden { display: none; }
@@ -62,6 +88,9 @@
       h2 { font-size: 1.5em; }
       button { font-size: 1em; }
       .quiz { padding: 10px; }
+      .score { font-size: 16px; padding: 8px; top: 5px; right: 10px; }
+      .select-container { flex-direction: column; gap: 5px; }
+      #numQuestions, #difficulty { width: 100%; }
     }
   </style>
   <!-- Include pdf.js for PDF support -->
@@ -72,35 +101,71 @@
 <body>
 
   <h2>📘 Auto Quiz Generator</h2>
-  <p>Paste your lesson text or upload a file (TXT, PDF, DOCX):</p>
+  <div id="inputSection">
+    <p>Paste your lesson text or upload a file (TXT, PDF, DOCX):</p>
 
-  <textarea id="lessonInput" placeholder="Paste your lesson here..."></textarea>
-  
-  <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
+    <textarea id="lessonInput" placeholder="Paste your lesson here..."></textarea>
+    
+    <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
 
-  <div class="api-section">
-    <p>Enter your Google Gemini API Key (optional for AI-generated quizzes):</p>
-    <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
+    <div class="api-section">
+      <p>Choose AI source:</p>
+      <label><input type="radio" name="aiSource" value="our" checked> Use Our AI</label>
+      <label><input type="radio" name="aiSource" value="your"> Use Your AI</label>
+      <label><input type="radio" name="aiSource" value="none"> Local Generation </label>
+      <div id="yourKeySection" style="display: none;">
+        <p>Enter your Google Gemini API Key:</p>
+        <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
+      </div>
+    </div>
+
+    <div class="select-container">
+      <div style="width: 60%;">
+        <p>Select number of questions:</p>
+        <select id="numQuestions">
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+      <div style="width: 40%;">
+        <p>Select difficulty:</p>
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+    </div>
   </div>
 
-  <p>Select number of questions:</p>
-  <select id="numQuestions">
-    <option value="5">5</option>
-    <option value="10">10</option>
-    <option value="25">25</option>
-    <option value="50">50</option>
-  </select>
-
   <button onclick="generateQuiz()">Generate Quiz</button>
+  <button class="reset" onclick="resetApp()">Reset</button>
 
   <div id="quizContainer" class="quiz"></div>
   <div id="scoreContainer" class="score"></div>
   <div id="errorContainer" class="error"></div>
 
   <script>
+    const OUR_API_KEYS = [
+      'AIzaSyAWzYm6D6z1XUWe8rSJbMuTqJqI_8kO-5U', // Replace with real key 1
+      'YOUR_KEY_2_HERE', // Key 2
+      'YOUR_KEY_3_HERE', // Key 3
+      'YOUR_KEY_4_HERE', // Key 4
+      'YOUR_KEY_5_HERE'  // Key 5
+    ];
+
     let totalQuestions = 0;
     let correctAnswers = 0;
     let questions = []; // To store generated questions
+
+    // Toggle API key input visibility
+    document.querySelectorAll('input[name="aiSource"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.getElementById('yourKeySection').style.display = radio.value === 'your' ? 'block' : 'none';
+      });
+    });
 
     // Handle file upload and extract text
     document.getElementById("fileInput").addEventListener("change", async function(event) {
@@ -146,14 +211,16 @@
 
     async function generateQuiz() {
       const lesson = document.getElementById("lessonInput").value.trim();
-      const apiKey = document.getElementById("apiKeyInput").value.trim();
+      const aiSource = document.querySelector('input[name="aiSource"]:checked').value;
+      const userApiKey = aiSource === 'your' ? document.getElementById("apiKeyInput").value.trim() : null;
       const numQuestions = document.getElementById("numQuestions").value;
+      const difficulty = document.getElementById("difficulty").value;
       const quizContainer = document.getElementById("quizContainer");
       const scoreContainer = document.getElementById("scoreContainer");
       const errorContainer = document.getElementById("errorContainer");
-      const apiSection = document.querySelector(".api-section");
       quizContainer.innerHTML = "";
       scoreContainer.innerHTML = "";
+      scoreContainer.style.display = 'none'; // Hide score initially
       errorContainer.innerHTML = "";
       totalQuestions = 0;
       correctAnswers = 0;
@@ -164,27 +231,39 @@
         return;
       }
 
-      // Hide API section after generation starts
-      apiSection.classList.add("hidden");
+      // Hide input section after successful input
+      document.getElementById("inputSection").classList.add("hidden");
 
-      // If API key is provided, use Gemini API for advanced quiz generation
-      if (apiKey) {
-        try {
-          const generatedQuestions = await generateAIQuestions(lesson, apiKey, numQuestions);
-          questions = generatedQuestions;
-        } catch (error) {
-          errorContainer.innerHTML = "Error generating quiz with AI: " + error.message;
-          apiSection.classList.remove("hidden"); // Show again on error
-          return;
+      let generated = false;
+
+      if (aiSource !== 'none') {
+        // Try AI generation
+        const keysToUse = aiSource === 'our' ? OUR_API_KEYS : [userApiKey];
+        for (let i = 0; i < keysToUse.length; i++) {
+          try {
+            const generatedQuestions = await generateAIQuestions(lesson, keysToUse[i], numQuestions, difficulty);
+            questions = generatedQuestions;
+            generated = true;
+            break; // Success, stop trying other keys
+          } catch (error) {
+            if (i === keysToUse.length - 1) {
+              errorContainer.innerHTML = "All API attempts failed: " + error.message + ". Falling back to local generation.";
+            }
+          }
         }
       } else {
-        // Fallback to simple fill-in-the-blank if no API key
-        questions = generateSimpleQuestions(lesson, numQuestions);
+        // No AI selected, use local generation directly
+        generated = true;
+      }
+
+      // Fallback to local if AI failed or No AI selected
+      if (!generated || aiSource === 'none') {
+        questions = generateSimpleMCQ(lesson, numQuestions, difficulty);
       }
 
       if (questions.length === 0) {
         errorContainer.innerHTML = "Could not generate questions from the provided text.";
-        apiSection.classList.remove("hidden"); // Show again on error
+        document.getElementById("inputSection").classList.remove("hidden"); // Show inputs again on error
         return;
       }
 
@@ -192,25 +271,17 @@
         totalQuestions++;
         let div = document.createElement("div");
         div.classList.add("question");
-        if (q.type === 'fill-in-the-blank') {
-          div.innerHTML = `
-            <p><b>Q${index + 1}:</b> ${q.question}</p>
-            <input type="text" placeholder="Your answer">
-            <button onclick="checkAnswer(this, '${q.answer}')">Check</button>
-          `;
-        } else if (q.type === 'multiple-choice') {
-          let optionsHtml = q.options.map((opt, i) => `
-            <label>
-              <input type="radio" name="q${index}" value="${i}">
-              ${opt}
-            </label><br>
-          `).join('');
-          div.innerHTML = `
-            <p><b>Q${index + 1}:</b> ${q.question}</p>
-            ${optionsHtml}
-            <button onclick="checkMCQAnswer(this, ${q.correctIndex}, ${index})">Check</button>
-          `;
-        }
+        let optionsHtml = q.options.map((opt, i) => `
+          <label>
+            <input type="radio" name="q${index}" value="${i}">
+            ${opt}
+          </label><br>
+        `).join('');
+        div.innerHTML = `
+          <p><b>Q${index + 1}:</b> ${q.question}</p>
+          ${optionsHtml}
+          <button onclick="checkMCQAnswer(this, ${q.correctIndex}, ${index})">Check</button>
+        `;
         quizContainer.appendChild(div);
       });
 
@@ -222,30 +293,46 @@
       }
     }
 
-    // Simple fallback question generator
-    function generateSimpleQuestions(lesson, num) {
+    // Simple local MCQ generator (fallback) with difficulty adjustment
+    function generateSimpleMCQ(lesson, num, difficulty) {
       let sentences = lesson.match(/[^.!?]+[.!?]/g) || [lesson];
       sentences = sentences.slice(0, num);
       let qs = [];
+      let numOptions = difficulty === 'easy' ? 3 : (difficulty === 'medium' ? 4 : 5); // Vary options by difficulty
       sentences.forEach(sentence => {
-        let words = sentence.split(" ");
-        if (words.length > 4) {
-          let randomIndex = Math.floor(Math.random() * words.length);
-          while (words[randomIndex].length < 4) {
-            randomIndex = Math.floor(Math.random() * words.length);
+        let words = sentence.split(" ").filter(w => w.length > 3); // Filter short words
+        if (words.length >= 1) {
+          let correctIndex = Math.floor(Math.random() * numOptions); // Random correct position
+          let question = "What is the best word to complete: " + sentence.replace(/\w+/g, (match, offset) => {
+            return (offset % (difficulty === 'easy' ? 3 : 2) === 0) ? "____" : match; // More blanks for harder
+          });
+          let options = [];
+          for (let i = 0; i < numOptions; i++) {
+            if (i === correctIndex) {
+              options.push(words[Math.floor(Math.random() * words.length)]); // Correct (random from text)
+            } else {
+              options.push(generateDistractor(difficulty)); // Distractors based on difficulty
+            }
           }
-          let answer = words[randomIndex].replace(/[^a-zA-Z]/g, "");
-          words[randomIndex] = "____";
-          qs.push({ type: 'fill-in-the-blank', question: words.join(" "), answer });
+          qs.push({ question, options, correctIndex });
         }
       });
       return qs;
     }
 
-    // Gemini API integration for AI-generated questions with structured output
-    async function generateAIQuestions(lesson, apiKey, num) {
+    // Helper for simple distractors (random words, harder = more obscure)
+    function generateDistractor(difficulty) {
+      const easyDistractors = ['apple', 'blue', 'house', 'quick', 'jump'];
+      const mediumDistractors = ['river', 'mountain', 'happy', 'book', 'computer'];
+      const hardDistractors = ['quantum', 'algorithm', 'paradox', 'synthesis', 'entropy'];
+      const pool = difficulty === 'easy' ? easyDistractors : (difficulty === 'medium' ? mediumDistractors : hardDistractors);
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // Gemini API integration for AI-generated questions with structured output (only MCQ)
+    async function generateAIQuestions(lesson, apiKey, num, difficulty) {
       const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey;
-      const prompt = `Generate ${num} quiz questions from the following text. Include a mix of fill-in-the-blank and multiple-choice questions.
+      const prompt = `Generate ${num} multiple-choice quiz questions at ${difficulty} difficulty from the following text. Each question should have 4 options, with one best answer.
 
 Text: ${lesson}`;
 
@@ -261,16 +348,14 @@ Text: ${lesson}`;
               items: {
                 type: 'OBJECT',
                 properties: {
-                  type: { type: 'STRING' },
                   question: { type: 'STRING' },
-                  answer: { type: 'STRING' },
                   options: {
                     type: 'ARRAY',
                     items: { type: 'STRING' }
                   },
                   correctIndex: { type: 'INTEGER' }
                 },
-                propertyOrdering: ['type', 'question', 'answer', 'options', 'correctIndex']
+                propertyOrdering: ['question', 'options', 'correctIndex']
               }
             }
           }
@@ -284,20 +369,6 @@ Text: ${lesson}`;
       const data = await response.json();
       const jsonText = data.candidates[0].content.parts[0].text;
       return JSON.parse(jsonText);
-    }
-
-    function checkAnswer(button, correctAnswer) {
-      const input = button.previousElementSibling;
-      if (!input.disabled) {
-        if (input.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
-          correctAnswers++;
-          input.style.borderColor = "green";
-        } else {
-          input.style.borderColor = "red";
-        }
-        input.disabled = true;
-        button.disabled = true;
-      }
     }
 
     function checkMCQAnswer(button, correctIndex, qIndex) {
@@ -318,8 +389,25 @@ Text: ${lesson}`;
     }
 
     function showScore() {
+      const scoreText = `🎯 Your Score: ${correctAnswers} / ${totalQuestions}`;
       const scoreContainer = document.getElementById("scoreContainer");
-      scoreContainer.innerHTML = `🎯 Your Score: ${correctAnswers} / ${totalQuestions}`;
+      scoreContainer.innerHTML = scoreText;
+      scoreContainer.style.display = 'block'; // Show in top right
+      alert(scoreText); // Pop-up alert
+    }
+
+    function resetApp() {
+      document.getElementById("lessonInput").value = "";
+      document.getElementById("fileInput").value = "";
+      document.getElementById("quizContainer").innerHTML = "";
+      document.getElementById("scoreContainer").innerHTML = "";
+      document.getElementById("scoreContainer").style.display = 'none';
+      document.getElementById("errorContainer").innerHTML = "";
+      totalQuestions = 0;
+      correctAnswers = 0;
+      questions = [];
+      // Show input section again
+      document.getElementById("inputSection").classList.remove("hidden");
     }
   </script>
 
