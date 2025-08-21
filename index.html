@@ -207,7 +207,9 @@
   <div id="inputSection">
     <b><p>Create Quiz with Your Own Data</p></b>
 
-    <textarea id="lessonInput" placeholder="Paste your lesson text or upload a file (TXT, PDF, DOCX):"></textarea>
+    <textarea id="lessonInput" placeholder="Paste your lesson text or upload a file (TXT, PDF, DOCX): 
+    
+    if you dont have any then choose Quiz Maker Data "></textarea>
     
     <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
 
@@ -302,7 +304,7 @@
     <button onclick="hideInfo()">Close</button>
   </div>
 
-  <footer>Designed by THOSHO</footer>
+  <footer>Designed by THOSHO <button id="darkModeToggle" onclick="toggleDarkMode()">🌙</button></footer>
 
   <script>
     const OUR_API_KEYS = [
