@@ -12,6 +12,47 @@
       line-height: 1.5; 
       position: relative; /* For absolute positioning */
     }
+    body.dark {
+      background: #121212;
+      color: #ffffff;
+    }
+    body.dark .quiz {
+      background: #1e1e1e;
+    }
+    body.dark input, body.dark textarea, body.dark select {
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+    }
+    body.dark button {
+      background: #388E3C; /* Darker green */
+    }
+    body.dark button:hover {
+      background: #2E7D32;
+    }
+    body.dark button.reset {
+      background: #D32F2F;
+    }
+    body.dark button.reset:hover {
+      background: #B71C1C;
+    }
+    body.dark .score {
+      color: #A5D6A7;
+      background: #1B5E20;
+    }
+    body.dark .loading {
+      color: #81C784;
+    }
+    body.dark .error {
+      color: #EF5350;
+    }
+    body.dark #infoModal {
+      background: #1e1e1e;
+      color: #fff;
+    }
+    body.dark #infoModal a {
+      color: #81C784;
+    }
     h2 { text-align: center; }
     textarea { 
       width: 100%; 
@@ -62,7 +103,7 @@
     .question { margin-bottom: 15px; }
     .score { 
       position: absolute; 
-      top: 10px; 
+      top: 10 متح; 
       right: 20px; 
       font-weight: bold; 
       font-size: 18px; 
@@ -75,9 +116,40 @@
       display: none; /* Hidden initially */
     }
     .api-section { margin-bottom: 20px; }
+    .api-section label {
+      display: block; /* Stack vertically */
+      margin-bottom: 5px;
+    }
     .error { color: red; text-align: center; }
     .loading { color: blue; text-align: center; font-style: italic; }
     .hidden { display: none; }
+    #infoModal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+      max-width: 400px;
+      display: none;
+    }
+    #infoModal h3 { margin-top: 0; }
+    #infoModal ol { margin: 10px 0; padding-left: 20px; }
+    #infoModal a { color: #4CAF50; text-decoration: underline; }
+    #infoModal button { width: auto; background: #4CAF50; margin-top: 10px; }
+    #darkModeToggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+    }
 
     /* Mobile responsiveness */
     @media (max-width: 600px) {
@@ -88,6 +160,9 @@
       .score { font-size: 16px; padding: 8px; top: 5px; right: 10px; }
       .select-container { flex-direction: column; gap: 5px; }
       select { width: 100%; }
+      button.info { height: auto; }
+      #infoModal { max-width: 90%; padding: 15px; }
+      #darkModeToggle { font-size: 18px; top: 5px; right: 5px; }
     }
   </style>
   <!-- Include pdf.js for PDF support -->
@@ -96,6 +171,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 </head>
 <body>
+
+  <button id="darkModeToggle" onclick="toggleDarkMode()">🌙</button>
 
   <h2>📘 Quiz Generator</h2>
   <div id="inputSection">
@@ -108,7 +185,7 @@
     <div class="api-section">
       <p>Choose AI source:</p>
       <label><input type="radio" name="aiSource" value="our" checked> Use Our AI</label>
-      <label><input type="radio" name="aiSource" value="your"> Use Your AI</label>
+      <label><input type="radio" name="aiSource" value="your"> Use Your AI<button class="info" onclick="showInfo()" style="margin-left: 5px; width: auto; padding: 2px 6px; font-size: 12px;">?</button></label>
       <label><input type="radio" name="aiSource" value="none"> Local Generation</label>
       <div id="yourKeySection" style="display: none;">
         <p>Enter your Google Gemini API Key:</p>
@@ -151,6 +228,20 @@
   <div id="scoreContainer" class="score"></div>
   <div id="errorContainer" class="error"></div>
 
+  <!-- Info Modal -->
+  <div id="infoModal">
+    <h3>How to Create Your Own Gemini API Key</h3>
+    <ol>
+      <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</li>
+      <li>Sign in with your Google account (or create one if needed).</li>
+      <li>Click "Get API key" or create a new project.</li>
+      <li>Copy the generated API key.</li>
+      <li>Paste it into the "Your AI" input field in this app.</li>
+    </ol>
+    <p>Note: Free tier has usage limits; check Google's terms.</p>
+    <button onclick="hideInfo()">Close</button>
+  </div>
+
   <script>
     const OUR_API_KEYS = [
       'AIzaSyAWzYm6D6z1XUWe8rSJbMuTqJqI_8kO-5U', // Replace with real key 1
@@ -164,12 +255,33 @@
     let correctAnswers = 0;
     let questions = []; // To store generated questions
 
+    // Dark mode toggle
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      const toggleBtn = document.getElementById('darkModeToggle');
+      toggleBtn.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+      localStorage.setItem('darkMode', document.body.classList.contains('dark') ? 'enabled' : 'disabled');
+    }
+
+    // Load dark mode preference
+    if (localStorage.getItem('darkMode') === 'enabled') {
+      toggleDarkMode();
+    }
+
     // Toggle API key input visibility
     document.querySelectorAll('input[name="aiSource"]').forEach(radio => {
       radio.addEventListener('change', () => {
         document.getElementById('yourKeySection').style.display = radio.value === 'your' ? 'block' : 'none';
       });
     });
+
+    // Show/Hide Info Modal
+    function showInfo() {
+      document.getElementById('infoModal').style.display = 'block';
+    }
+    function hideInfo() {
+      document.getElementById('infoModal').style.display = 'none';
+    }
 
     // Handle file upload and extract text
     document.getElementById("fileInput").addEventListener("change", async function(event) {
