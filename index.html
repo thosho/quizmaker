@@ -196,9 +196,7 @@
       footer #darkModeToggle { right: 10px; }
     }
   </style>
-  <!-- Include pdf.js for PDF support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.338/pdf.min.js"></script>
-  <!-- Include mammoth.js for DOCX support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 </head>
 <body>
@@ -222,7 +220,7 @@
         <input type="password" id="apiKeyInput" placeholder="Your Gemini API Key">
       </div>
       <label><input type="radio" name="aiSource" value="none"> Local (not advanced Q's)</label>
-       <b><p>Create Quiz with our DATA</p></b>
+      <b><p>Create Quiz with our DATA</p></b>
       <label><input type="radio" name="aiSource" value="opentdb"> Quiz Maker Data</label>
     </div>
 
@@ -290,7 +288,6 @@
   <div id="quizContainer" class="quiz"></div>
   <div id="errorContainer" class="error"></div>
 
-  <!-- Info Modal -->
   <div id="infoModal">
     <h3>How to Create Your Own Gemini API Key</h3>
     <ol>
@@ -508,19 +505,20 @@
         quizContainer.appendChild(div);
       });
 
-     if (totalQuestions > 0) {
+      if (totalQuestions > 0) {
         let finishBtn = document.createElement("button");
         finishBtn.textContent = "Finish Quiz";
         finishBtn.onclick = showScore;
         quizContainer.appendChild(finishBtn);
 
-        // START: ADD THESE TWO LINES
+        // ### START: ADD EXPORT BUTTON ###
         let exportBtn = document.createElement("button");
         exportBtn.textContent = "Export to HTML";
         exportBtn.onclick = exportQuizToHTML;
         quizContainer.appendChild(exportBtn);
-        // END: ADD THESE TWO LINES
+        // ### END: ADD EXPORT BUTTON ###
       }
+    }
 
     // Simple local question generator (MCQ or True/False) with difficulty adjustment
     function generateSimpleQuestions(lesson, num, difficulty, quizType) {
@@ -605,31 +603,28 @@ Text: ${lesson}`;
       const jsonText = data.candidates[0].content.parts[0].text;
       return JSON.parse(jsonText);
     }
-    
-    // New function to export the quiz to a standalone HTML file
+
+    // ### START: NEW EXPORT FUNCTION ###
     function exportQuizToHTML() {
       if (questions.length === 0) {
         alert("Please generate a quiz first before exporting!");
         return;
       }
-
-      // 1. Generate the HTML for the questions
       const quizHtml = questions.map((q, index) => {
+        // Note the onclick event added here to call the exported file's checkAnswer function
         const optionsHtml = q.options.map((opt, i) => `
           <label>
-            <input type="radio" name="q${index}" value="${i}" onclick="checkAnswer(this, ${index})">
+            <input type="radio" name="q${index}" value="${i}" onclick="checkAnswer(this, ${q.correctIndex}, ${index})">
             ${opt.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
           </label><br>
         `).join('');
         return `
-          <div class="question" id="q-container-${index}">
+          <div class="question">
             <p><b>Q${index + 1}:</b> ${q.question.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-            ${optionsHtml}
+            <div id="q-container-${index}">${optionsHtml}</div>
           </div>
         `;
       }).join('');
-
-      // 2. Create the full HTML file content as a string
       const fullHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -641,66 +636,64 @@ Text: ${lesson}`;
     body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; line-height: 1.5; }
     .quiz-container { max-width: 800px; margin: auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     h2 { text-align: center; color: #333; }
+    h2 .final-score { font-size: 24px; font-weight: bold; color: #4CAF50; display: block; margin-top: 10px; }
     .question { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
     .question p { margin-bottom: 10px; }
     label { display: block; margin-bottom: 5px; cursor: pointer; }
     button { padding: 10px 20px; border: none; background: #4CAF50; color: white; cursor: pointer; border-radius: 6px; font-size: 16px; display: block; margin: 20px auto 0; }
     button:hover { background: #45a049; }
-    #scoreContainer { text-align: center; font-size: 24px; font-weight: bold; margin-top: 20px; color: #4CAF50; }
   </style>
 </head>
 <body>
   <div class="quiz-container">
-    <h2>My Quiz</h2>
+    <h2>My Quiz <span id="scoreContainer" class="final-score"></span></h2>
     <div id="quiz">
       ${quizHtml}
     </div>
-    <button id="finishBtn" onclick="showScore()">Finish Quiz</button>
-    <div id="scoreContainer"></div>
+    <button id="finishBtn" onclick="showFinalScore()">Finish Quiz</button>
   </div>
 
   <script>
-    const quizData = ${JSON.stringify(questions)};
     let correctAnswers = 0;
-    
-    function checkAnswer(radio, qIndex) {
-      const selectedValue = parseInt(radio.value);
-      const correctIndex = quizData[qIndex].correctIndex;
-      const questionContainer = document.getElementById('q-container-' + qIndex);
-      const radios = document.querySelectorAll('input[name="q' + qIndex + '"]');
+    const totalQuestions = ${questions.length};
 
-      // Disable all options for this question
-      radios.forEach(r => r.disabled = true);
-
+    // This function runs inside the exported file.
+    // It provides immediate feedback just like the main app.
+    function checkAnswer(radio, correctIndex, qIndex) {
+      const optionsContainer = document.getElementById('q-container-' + qIndex);
+      const radios = optionsContainer.querySelectorAll('input[name="q' + qIndex + '"]');
+      let selectedValue = parseInt(radio.value);
+      
+      radios.forEach(r => r.disabled = true); // Disable all options for this question
+      
       if (selectedValue === correctIndex) {
-        // Mark as correct, but don't reveal the answer visually to keep it a test
-        radio.parentElement.style.fontWeight = 'bold'; 
+        correctAnswers++;
+        radio.parentElement.style.color = "green";
+        radio.parentElement.style.fontWeight = "bold";
       } else {
-        radio.parentElement.style.color = 'red';
-        radio.parentElement.style.fontWeight = 'bold';
+        radio.parentElement.style.color = "red";
+        radio.parentElement.style.fontWeight = "bold";
+        // Also show the correct answer
+        radios.forEach(r => {
+          if(parseInt(r.value) === correctIndex) {
+            r.parentElement.style.color = "green";
+            r.parentElement.style.fontWeight = "bold";
+          }
+        });
       }
     }
-
-    function showScore() {
-      correctAnswers = 0;
-      quizData.forEach((q, index) => {
-        const selectedRadio = document.querySelector('input[name="q' + index + '"]:checked');
-        if (selectedRadio && parseInt(selectedRadio.value) === q.correctIndex) {
-          correctAnswers++;
-        }
-      });
-      
-      const scoreText = \`🎯 Your Score: \${correctAnswers} / \${quizData.length}\`;
+    
+    // This function displays the final score.
+    function showFinalScore() {
+      const scoreText = \`🎯 Your Score: \${correctAnswers} / \${totalQuestions}\`;
       document.getElementById("scoreContainer").innerText = scoreText;
-      document.getElementById("finishBtn").style.display = 'none'; // Hide button after finishing
+      document.getElementById("finishBtn").style.display = 'none'; // Hide the button
       alert(scoreText);
     }
-  <\/script>
+  <` + `/script>
 </body>
 </html>
       `;
-
-      // 3. Create a Blob and trigger the download
       const blob = new Blob([fullHtml], { type: 'text/html' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -710,6 +703,7 @@ Text: ${lesson}`;
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     }
+    // ### END: NEW EXPORT FUNCTION ###
 
     function checkMCQAnswer(radio, correctIndex, qIndex) {
       const optionsContainer = radio.parentElement.parentElement; // Assuming label > input, parent is label, grandparent is options div
