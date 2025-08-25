@@ -201,7 +201,7 @@
 </head>
 <body>
 
-  <h2>QUAIZER <span id="scoreContainer" class="score"></span></h2>
+  <h2>QUAIZER<span style="display: block; font-size: 14px; font-weight: normal; font-family: 'Courier New', monospace;">AI QUIZ MAKER</span><span id="scoreContainer" class="score"></span></h2>
   <div id="inputSection">
     <b><p>Create Quiz with Your Own Data</p></b>
 
@@ -329,14 +329,51 @@
       toggleDarkMode();
     }
 
-    // Toggle API key input visibility
+    // Toggle API key input visibility and handle question limits
     document.querySelectorAll('input[name="aiSource"]').forEach(radio => {
       radio.addEventListener('change', () => {
+        // Original logic to show/hide other sections
         document.getElementById('yourKeySection').style.display = radio.value === 'your' ? 'block' : 'none';
         document.getElementById('categoryContainer').style.display = radio.value === 'opentdb' ? 'block' : 'none';
         document.getElementById('quizTypeContainer').style.display = radio.value === 'opentdb' ? 'none' : 'block';
+
+        // --- Corrected logic to show only 5 and 10 for "Our AI" ---
+        const numQuestionsSelect = document.getElementById('numQuestions');
+        const allOptions = numQuestionsSelect.options;
+        let isCurrentSelectionVisible = false;
+
+        if (radio.value === 'our') {
+          // If 'Our AI' is selected, loop through options
+          for (let i = 0; i < allOptions.length; i++) {
+            let option = allOptions[i];
+            // Check if the option value is '5' OR '10'
+            if (option.value === '5' || option.value === '10') {
+              option.style.display = ''; // Show this option
+              if (option.selected) {
+                isCurrentSelectionVisible = true;
+              }
+            } else {
+              option.style.display = 'none'; // Hide this option
+            }
+          }
+          // If the previously selected option (e.g., 25) is now hidden, default to '5'.
+          if (!isCurrentSelectionVisible) {
+            numQuestionsSelect.value = '5';
+          }
+        } else {
+          // If any other AI source is selected, make all options visible again
+          for (let i = 0; i < allOptions.length; i++) {
+            allOptions[i].style.display = '';
+          }
+        }
       });
     });
+    
+     // ### ADD THIS ONE LINE TO FIX THE ON-LOAD BUG ###
+    document.querySelector('input[name="aiSource"]:checked').dispatchEvent(new Event('change'));
+
+    // Run the check once on page load to set the correct initial state for "Our AI"
+    document.querySelector('input[name="aiSource"]:checked').dispatchEvent(new Event('change'));
 
     // Show/Hide Info Modal
     function showInfo() {
