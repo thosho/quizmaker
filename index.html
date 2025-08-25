@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto Quiz Generator</title>
+  <title>AI Quiz Maker</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
   <style>
     body { 
@@ -508,13 +508,19 @@
         quizContainer.appendChild(div);
       });
 
-      if (totalQuestions > 0) {
+     if (totalQuestions > 0) {
         let finishBtn = document.createElement("button");
         finishBtn.textContent = "Finish Quiz";
         finishBtn.onclick = showScore;
         quizContainer.appendChild(finishBtn);
+
+        // START: ADD THESE TWO LINES
+        let exportBtn = document.createElement("button");
+        exportBtn.textContent = "Export to HTML";
+        exportBtn.onclick = exportQuizToHTML;
+        quizContainer.appendChild(exportBtn);
+        // END: ADD THESE TWO LINES
       }
-    }
 
     // Simple local question generator (MCQ or True/False) with difficulty adjustment
     function generateSimpleQuestions(lesson, num, difficulty, quizType) {
@@ -598,6 +604,111 @@ Text: ${lesson}`;
       const data = await response.json();
       const jsonText = data.candidates[0].content.parts[0].text;
       return JSON.parse(jsonText);
+    }
+    
+    // New function to export the quiz to a standalone HTML file
+    function exportQuizToHTML() {
+      if (questions.length === 0) {
+        alert("Please generate a quiz first before exporting!");
+        return;
+      }
+
+      // 1. Generate the HTML for the questions
+      const quizHtml = questions.map((q, index) => {
+        const optionsHtml = q.options.map((opt, i) => `
+          <label>
+            <input type="radio" name="q${index}" value="${i}" onclick="checkAnswer(this, ${index})">
+            ${opt.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+          </label><br>
+        `).join('');
+        return `
+          <div class="question" id="q-container-${index}">
+            <p><b>Q${index + 1}:</b> ${q.question.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+            ${optionsHtml}
+          </div>
+        `;
+      }).join('');
+
+      // 2. Create the full HTML file content as a string
+      const fullHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Quiz</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; line-height: 1.5; }
+    .quiz-container { max-width: 800px; margin: auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #333; }
+    .question { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+    .question p { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 5px; cursor: pointer; }
+    button { padding: 10px 20px; border: none; background: #4CAF50; color: white; cursor: pointer; border-radius: 6px; font-size: 16px; display: block; margin: 20px auto 0; }
+    button:hover { background: #45a049; }
+    #scoreContainer { text-align: center; font-size: 24px; font-weight: bold; margin-top: 20px; color: #4CAF50; }
+  </style>
+</head>
+<body>
+  <div class="quiz-container">
+    <h2>My Quiz</h2>
+    <div id="quiz">
+      ${quizHtml}
+    </div>
+    <button id="finishBtn" onclick="showScore()">Finish Quiz</button>
+    <div id="scoreContainer"></div>
+  </div>
+
+  <script>
+    const quizData = ${JSON.stringify(questions)};
+    let correctAnswers = 0;
+    
+    function checkAnswer(radio, qIndex) {
+      const selectedValue = parseInt(radio.value);
+      const correctIndex = quizData[qIndex].correctIndex;
+      const questionContainer = document.getElementById('q-container-' + qIndex);
+      const radios = document.querySelectorAll('input[name="q' + qIndex + '"]');
+
+      // Disable all options for this question
+      radios.forEach(r => r.disabled = true);
+
+      if (selectedValue === correctIndex) {
+        // Mark as correct, but don't reveal the answer visually to keep it a test
+        radio.parentElement.style.fontWeight = 'bold'; 
+      } else {
+        radio.parentElement.style.color = 'red';
+        radio.parentElement.style.fontWeight = 'bold';
+      }
+    }
+
+    function showScore() {
+      correctAnswers = 0;
+      quizData.forEach((q, index) => {
+        const selectedRadio = document.querySelector('input[name="q' + index + '"]:checked');
+        if (selectedRadio && parseInt(selectedRadio.value) === q.correctIndex) {
+          correctAnswers++;
+        }
+      });
+      
+      const scoreText = \`🎯 Your Score: \${correctAnswers} / \${quizData.length}\`;
+      document.getElementById("scoreContainer").innerText = scoreText;
+      document.getElementById("finishBtn").style.display = 'none'; // Hide button after finishing
+      alert(scoreText);
+    }
+  <\/script>
+</body>
+</html>
+      `;
+
+      // 3. Create a Blob and trigger the download
+      const blob = new Blob([fullHtml], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'quiz.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
     }
 
     function checkMCQAnswer(radio, correctIndex, qIndex) {
